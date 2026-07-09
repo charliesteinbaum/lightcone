@@ -199,6 +199,36 @@ input[type=range]::-moz-range-thumb{
   white-space:nowrap;
 }
 
+/* ── Hover tooltip ───────────────────────────────────────────── */
+#tooltip{
+  position:fixed;
+  right:142px;
+  width:272px;
+  background:rgba(4,7,14,0.97);
+  border:1px solid rgba(255,255,255,0.28);
+  border-radius:6px;
+  padding:14px 16px;
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  z-index:30;
+  display:none;
+  pointer-events:none;
+  transform:translateY(-50%);
+}
+#tt-name{
+  font-size:9px;
+  letter-spacing:.32em;
+  text-transform:uppercase;
+  font-weight:700;
+  margin-bottom:9px;
+}
+#tt-body{
+  font-size:9px;
+  line-height:1.7;
+  color:rgba(255,255,255,0.58);
+  letter-spacing:.03em;
+}
+
 /* ── Sidebar presets ─────────────────────────────────────────── */
 #sidebar{
   position:fixed;
@@ -260,6 +290,8 @@ input[type=range]::-moz-range-thumb{
 </div>
 
 <div id="time-label">time</div>
+
+<div id="tooltip"><div id="tt-name"></div><div id="tt-body"></div></div>
 
 <div id="sidebar">
   <button class="preset-btn active" data-preset="custom">Custom</button>
@@ -957,6 +989,61 @@ function loadPreset(name){
 document.querySelectorAll('.preset-btn').forEach(btn=>{
   btn.addEventListener('click',()=>loadPreset(btn.dataset.preset));
 });
+
+// ── Story tooltips ─────────────────────────────────────────────
+const STORIES = {
+  yahoo: {
+    color:'#FF6B6B',
+    text:"The internet's original homepage. Yahoo turned down acquiring Google for $1M in 1998 and again for $3B in 2002. As search became the core utility of the web, Yahoo's portal model became obsolete. They never built a competitive search product. Sold to Verizon in 2016 for $4.5B — less than 4% of their $125B peak valuation."
+  },
+  myspace: {
+    color:'#FF6B6B',
+    text:"The world's first mass social network, reaching 100M users by 2006. After News Corp's $580M acquisition, executives prioritized ad revenue over user experience — cluttered profiles, slow load times, no mobile strategy. Facebook overtook Myspace in unique visitors in April 2008 and never looked back. Sold for $35M in 2011."
+  },
+  blackberry: {
+    color:'#FF6B6B',
+    text:"Defined the smartphone before iPhone existed. BlackBerry had 50% of the US market and 85M subscribers by 2009. When Apple launched the touchscreen in 2007, BlackBerry's CEO called it a toy. Their touchscreen response — the Storm — was widely panned. The smartphone market kept accelerating without them. By 2016 they held 0% market share and ceased making phones entirely."
+  },
+  google: {
+    color:'#4CC98A',
+    text:"Started in a Stanford dorm with a better algorithm. Turned down a $750K acquisition offer in 1998. Built search into the infrastructure of the internet, then expanded into Android, YouTube, Maps, and Cloud. Launched AdWords in 2000, which became the most profitable ad system ever built. Now at 90%+ global search share with over $300B in annual revenue — the defining success of the internet era."
+  },
+  uber: {
+    color:'#4CC98A',
+    text:"Created the ride-sharing category in 2009 and grew to near-total dominance before Lyft found a durable foothold. The #DeleteUber movement in 2017 and years of driver classification battles cost them share and credibility. Expanded into delivery with Uber Eats, broadening the market. Today holds ~76% of US ride-hail — dominant but permanently contested in a market they invented."
+  },
+  airbnb: {
+    color:'#4CC98A',
+    text:"Launched during the 2008 financial crisis when the founders rented air mattresses in their apartment to pay rent. Survived COVID's near-total collapse of travel — bookings dropped 72% in a single quarter in 2020 — and came back stronger than before. Grew from 28% to 44% of the short-term rental market between 2019 and 2024 while VRBO declined. One of the most durable marketplace businesses ever built."
+  },
+  cursor: {
+    color:'#9B71EA',
+    text:"The fastest-growing SaaS company in history. Built by a four-person team, Cursor reached $400M ARR in under 3 years — growing 20x faster than GitHub Copilot. Valued at $29B by late 2025. The AI developer tools market is still early and accelerating, and Cursor's share is expanding rapidly. This is what it looks like to build the right product at the exact inflection point of a category."
+  },
+  mercor: {
+    color:'#9B71EA',
+    text:"Founded by Thiel Fellows under 23, Mercor pivoted from AI-assisted hiring to training AI models for labs like OpenAI and Anthropic. Went from a $250M Series A to a $10B Series C in under two years, reaching $450M ARR by late 2025. A fast-growing but narrow market — concentrated in a handful of AI lab customers. The business model is still evolving, and the story is still being written."
+  },
+};
+
+(function(){
+  const tip=document.getElementById('tooltip');
+  const ttN=document.getElementById('tt-name');
+  const ttB=document.getElementById('tt-body');
+  document.querySelectorAll('.preset-btn').forEach(btn=>{
+    const s=STORIES[btn.dataset.preset];
+    if(!s) return;
+    btn.addEventListener('mouseenter',()=>{
+      ttN.textContent=btn.textContent.trim();
+      ttN.style.color=s.color;
+      ttB.textContent=s.text;
+      const r=btn.getBoundingClientRect();
+      tip.style.top=(r.top+r.height/2)+'px';
+      tip.style.display='block';
+    });
+    btn.addEventListener('mouseleave',()=>{ tip.style.display='none'; });
+  });
+})();
 
 // ── Boot ───────────────────────────────────────────────────────
 window.addEventListener('resize',()=>{resize();render();});
