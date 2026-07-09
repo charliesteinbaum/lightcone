@@ -262,7 +262,7 @@ input[type=range]::-moz-range-thumb{
 <div id="time-label">time</div>
 
 <div id="sidebar">
-  <button class="preset-btn active" data-preset="none">None</button>
+  <button class="preset-btn active" data-preset="custom">Custom</button>
 
   <div class="sidebar-section">Cautionary</div>
   <button class="preset-btn cautionary" data-preset="yahoo">Yahoo</button>
@@ -688,7 +688,7 @@ function render(){
   gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
 
   const asp=canvas.width/canvas.height;
-  const proj=perspective(Math.PI/4,asp,0.05,40);
+  const proj=perspective(Math.PI/4,asp,0.05,200);
   const eye=[
     target[0]+dist*Math.cos(elevation)*Math.sin(azimuth),
     target[1]+dist*Math.sin(elevation),
@@ -797,7 +797,7 @@ window.addEventListener('mouseup',()=>{drag=null;canvas.classList.remove('draggi
 canvas.addEventListener('wheel',e=>{
   e.preventDefault();
   dist*=1+e.deltaY*0.0008;
-  dist=Math.max(1.5,Math.min(14,dist));render();
+  dist=Math.max(1.5,Math.min(80,dist));render();
 },{passive:false});
 canvas.addEventListener('touchstart',e=>{
   if(e.touches.length===1) drag={x:e.touches[0].clientX,y:e.touches[0].clientY};
@@ -901,7 +901,7 @@ updateTaperLimits();
 
 // ── Presets ────────────────────────────────────────────────────
 const PRESETS = {
-  none:       { bend:0,    gt:0,   cv:5,  ct:0,  fill:0.30, t:0   },
+  custom:     { bend:0,    gt:0,   cv:5,  ct:0,  fill:0.30, t:0   },
   yahoo:      { bend:0.80, gt:-35, cv:6,  ct:-2, fill:0.70, t:-65 },
   myspace:    { bend:0.85, gt:-25, cv:7,  ct:-2, fill:0.80, t:-80 },
   blackberry: { bend:0.75, gt:20,  cv:5,  ct:1,  fill:0.50, t:-50 },
@@ -946,6 +946,10 @@ function loadPreset(name){
   document.querySelectorAll('.preset-btn').forEach(b=>{
     b.classList.toggle('active', b.dataset.preset===name);
   });
+
+  // Auto-fit camera to cone size
+  const topR = radius(1.0);
+  dist = Math.max(6, topR * 3.5);
 
   buildGeometry(); render();
 }
