@@ -1,0 +1,832 @@
+<meta charset="utf-8">
+<title>Light Cone</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+
+:root{
+  --bg:#06090F;
+  --surface:rgba(6,10,20,0.92);
+  --border:rgba(255,255,255,0.28);
+  --text:#5A7A98;
+  --accent:#FFFFFF;
+  --fill-color:#FF7240;
+  --track:#1A2030;
+  --cone-blue:#00C8F0;
+  --cone-fill:#FF7240;
+}
+
+body{
+  background:var(--bg);
+  overflow:hidden;
+  height:100vh;
+  font-family:'Courier New',Courier,monospace;
+  color:var(--text);
+  -webkit-user-select:none;
+  user-select:none;
+}
+
+canvas{
+  display:block;
+  position:fixed;
+  top:0;left:0;
+  cursor:grab;
+  touch-action:none;
+}
+canvas.dragging{cursor:grabbing}
+
+#hud{
+  position:fixed;
+  top:24px;left:28px;
+  pointer-events:none;
+  z-index:10;
+}
+#hud-title{
+  font-size:10px;
+  letter-spacing:.4em;
+  color:#fff;
+  font-weight:400;
+  text-transform:uppercase;
+  opacity:1;
+}
+#hud-sub{
+  font-size:9px;
+  letter-spacing:.18em;
+  color:var(--text);
+  margin-top:5px;
+  opacity:.45;
+  text-transform:uppercase;
+}
+
+#time-label{
+  position:fixed;
+  pointer-events:none;
+  z-index:10;
+  display:flex;
+  align-items:center;
+  gap:5px;
+  font-size:9px;
+  letter-spacing:.28em;
+  color:#fff;
+  text-transform:uppercase;
+  opacity:.72;
+  white-space:nowrap;
+  transform:translateY(-50%);
+}
+#time-label::before{
+  content:'';
+  display:block;
+  width:6px;height:6px;
+  border-top:1.5px solid #fff;
+  border-right:1.5px solid #fff;
+  transform:rotate(-45deg) translate(1px,1px);
+  flex-shrink:0;
+}
+
+#controls{
+  position:fixed;
+  bottom:0;left:0;right:0;
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  grid-template-rows:auto 1fr 1fr;
+  border-top:1px solid var(--border);
+  background:var(--surface);
+  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
+  z-index:10;
+}
+
+.group-header{
+  grid-row:1;
+  padding:7px 20px 5px;
+  font-size:9px;
+  letter-spacing:.32em;
+  text-transform:uppercase;
+  color:#fff;
+  opacity:.85;
+  border-bottom:1px solid var(--border);
+  white-space:nowrap;
+}
+.group-header.exo{
+  grid-column:1/3;
+  border-right:1px solid rgba(255,255,255,0.35);
+}
+.group-header.endo{
+  grid-column:3/4;
+}
+
+.ctrl{
+  padding:12px 20px 16px;
+  border-right:1px solid var(--border);
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.ctrl:last-child{border-right:none}
+/* taper row sits flush below its parent — no separator */
+.ctrl.taper-row{border-top:none;}
+/* stronger divider between exo / endo groups */
+.ctrl.divider{border-right:1px solid rgba(255,255,255,0.35)}
+
+/* Per-variable accent colours — Growth same cyan as Constant */
+.ctrl.growth  {--accent:#00C8F0;}
+.ctrl.constant{--accent:#00C8F0;}
+.ctrl.market  {--accent:#FF7240;}
+
+.ctrl-label{
+  font-size:9px;
+  letter-spacing:.32em;
+  color:#fff;
+  text-transform:uppercase;
+  opacity:.80;
+  white-space:nowrap;
+}
+
+/* Slider with value label on the thumb */
+.slider-wrap{
+  position:relative;
+  height:22px;
+  display:flex;
+  align-items:center;
+  --p:50;
+}
+
+input[type=range]{
+  -webkit-appearance:none;
+  appearance:none;
+  width:100%;
+  height:1px;
+  background:linear-gradient(to right,
+    var(--accent) 0%,
+    var(--accent) calc(var(--p)*1%),
+    var(--track) calc(var(--p)*1%),
+    var(--track) 100%);
+  outline:none;
+  border:none;
+  cursor:pointer;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;
+  width:46px;height:20px;
+  border-radius:10px;
+  background:var(--accent);
+  cursor:pointer;
+  box-shadow:0 0 12px var(--accent),0 0 3px var(--accent);
+  transition:transform .1s;
+}
+input[type=range]:active::-webkit-slider-thumb{transform:scale(1.06)}
+input[type=range]::-moz-range-thumb{
+  width:46px;height:20px;
+  border-radius:10px;
+  background:var(--accent);
+  cursor:pointer;
+  border:none;
+  box-shadow:0 0 14px var(--accent);
+}
+
+/* Value label rides on the thumb */
+.slider-val{
+  position:absolute;
+  top:50%;
+  left:calc(var(--p)*0.01*(100% - 46px) + 23px);
+  transform:translate(-50%,-50%);
+  pointer-events:none;
+  font-size:9px;
+  font-weight:700;
+  letter-spacing:.02em;
+  font-variant-numeric:tabular-nums;
+  color:#06090F;
+  white-space:nowrap;
+}
+</style>
+
+<canvas id="c"></canvas>
+
+<div id="hud">
+  <div id="hud-title">The Light Cone</div>
+</div>
+
+<div id="time-label">time</div>
+
+<div id="controls">
+  <div class="group-header exo">Exogenous</div>
+  <div class="group-header endo">Endogenous</div>
+
+  <!-- Row 1: main controls -->
+  <div class="ctrl growth">
+    <span class="ctrl-label">Growth</span>
+    <div class="slider-wrap">
+      <input type="range" id="sBend" min="0" max="100" value="0">
+      <span class="slider-val" id="vBend">0%</span>
+    </div>
+  </div>
+  <div class="ctrl constant divider">
+    <span class="ctrl-label">Constant</span>
+    <div class="slider-wrap">
+      <input type="range" id="sAngle" min="0" max="10" step="0.1" value="5">
+      <span class="slider-val" id="vAngle">5.0</span>
+    </div>
+  </div>
+  <div class="ctrl market">
+    <span class="ctrl-label">Market Capture</span>
+    <div class="slider-wrap">
+      <input type="range" id="sFill" min="0" max="100" value="30">
+      <span class="slider-val" id="vFill">30%</span>
+    </div>
+  </div>
+
+  <!-- Row 2: tapers -->
+  <div class="ctrl growth taper-row">
+    <span class="ctrl-label">Growth Taper</span>
+    <div class="slider-wrap">
+      <input type="range" id="sGrowthTaper" min="-100" max="100" value="0">
+      <span class="slider-val" id="vGrowthTaper">+0%</span>
+    </div>
+  </div>
+  <div class="ctrl constant taper-row divider">
+    <span class="ctrl-label">Constant Taper</span>
+    <div class="slider-wrap">
+      <input type="range" id="sConstTaper" min="-5" max="5" step="0.1" value="0">
+      <span class="slider-val" id="vConstTaper">+0.0</span>
+    </div>
+  </div>
+  <div class="ctrl market taper-row">
+    <span class="ctrl-label">Market Capture Taper</span>
+    <div class="slider-wrap">
+      <input type="range" id="sTaper" min="-100" max="100" value="0">
+      <span class="slider-val" id="vTaper">+0%</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Constants ──────────────────────────────────────────────────
+const H_MAX    = 2.0;
+const N_SEGS   = 72;
+const N_RINGS  = 48;
+const RING_STEP = 6;
+const TIP_Y    = H_MAX * 1.42;
+
+// ── State ──────────────────────────────────────────────────────
+let bend           = 0;     // 0–1, base exponential flare
+let growthTaper    = 0;     // signed %, adds to bend linearly with height
+let constantVal    = 5;     // display value 0–10 (maps to atan(val/20))
+let constantTaper  = 0;     // display value, signed; adds to constantVal linearly with height
+let fill           = 0.30;
+let taper          = 0;     // signed fraction: end fill = clamp(fill + taper, 0, 1)
+
+function localBend(t){ return Math.max(0, bend + (growthTaper/100) * t); }
+function localHalfAngle(t){ return Math.atan(Math.max(0, constantVal + constantTaper * t) / 20); }
+function localFill(t){ return Math.max(0, Math.min(1, fill + taper * t)); }
+
+let azimuth   = 0.55;
+let elevation = 0.38;
+let dist      = 7.2;
+const target  = [0, H_MAX * 0.52, 0];
+
+// ── WebGL ──────────────────────────────────────────────────────
+const canvas = document.getElementById('c');
+const gl     = canvas.getContext('webgl', {antialias: true, alpha: false});
+
+const VS = `
+attribute vec3 aPos;
+uniform mat4 uMVP;
+varying float vT;
+void main(){
+  vT = aPos.y / 2.0;
+  gl_Position = uMVP * vec4(aPos, 1.0);
+  gl_PointSize = 9.0;
+}`;
+
+const FS = `
+precision mediump float;
+uniform vec4 uColor;
+uniform int  uFade;
+varying float vT;
+void main(){
+  float a = uColor.a;
+  if(uFade == 1) a *= (0.15 + 0.85 * vT);
+  gl_FragColor = vec4(uColor.rgb, a);
+}`;
+
+function mkShader(type,src){
+  const s=gl.createShader(type);
+  gl.shaderSource(s,src);
+  gl.compileShader(s);
+  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(s));
+  return s;
+}
+
+const prog=gl.createProgram();
+gl.attachShader(prog,mkShader(gl.VERTEX_SHADER,VS));
+gl.attachShader(prog,mkShader(gl.FRAGMENT_SHADER,FS));
+gl.linkProgram(prog);
+gl.useProgram(prog);
+
+const L={
+  aPos:  gl.getAttribLocation(prog,'aPos'),
+  uMVP:  gl.getUniformLocation(prog,'uMVP'),
+  uColor:gl.getUniformLocation(prog,'uColor'),
+  uFade: gl.getUniformLocation(prog,'uFade'),
+};
+
+// ── Mat4 ───────────────────────────────────────────────────────
+function perspective(fovy,asp,n,f){
+  const t=1/Math.tan(fovy/2);
+  return new Float32Array([t/asp,0,0,0,0,t,0,0,0,0,(f+n)/(n-f),-1,0,0,(2*f*n)/(n-f),0]);
+}
+function lookAt(e,c,u){
+  let fx=c[0]-e[0],fy=c[1]-e[1],fz=c[2]-e[2];
+  let il=1/Math.hypot(fx,fy,fz);fx*=il;fy*=il;fz*=il;
+  let sx=fy*u[2]-fz*u[1],sy=fz*u[0]-fx*u[2],sz=fx*u[1]-fy*u[0];
+  il=1/Math.hypot(sx,sy,sz);sx*=il;sy*=il;sz*=il;
+  const ux=sy*fz-sz*fy,uy=sz*fx-sx*fz,uz=sx*fy-sy*fx;
+  return new Float32Array([
+    sx,ux,-fx,0,sy,uy,-fy,0,sz,uz,-fz,0,
+    -(sx*e[0]+sy*e[1]+sz*e[2]),-(ux*e[0]+uy*e[1]+uz*e[2]),(fx*e[0]+fy*e[1]+fz*e[2]),1
+  ]);
+}
+function mul(a,b){
+  const o=new Float32Array(16);
+  for(let i=0;i<4;i++) for(let j=0;j<4;j++){
+    o[j*4+i]=0;for(let k=0;k<4;k++) o[j*4+i]+=a[k*4+i]*b[j*4+k];
+  }
+  return o;
+}
+
+function project3D(px,py,pz,mvp,W,H,dpr){
+  const c=[
+    mvp[0]*px+mvp[4]*py+mvp[8]*pz+mvp[12],
+    mvp[1]*px+mvp[5]*py+mvp[9]*pz+mvp[13],
+    mvp[2]*px+mvp[6]*py+mvp[10]*pz+mvp[14],
+    mvp[3]*px+mvp[7]*py+mvp[11]*pz+mvp[15],
+  ];
+  return{x:(c[0]/c[3]+1)*0.5*W/dpr, y:(1-c[1]/c[3])*0.5*H/dpr};
+}
+
+// ── Radius function ────────────────────────────────────────────
+// halfAngle = atan(growthPct/100), so 1 time-unit up → growthPct% wider.
+// bend>0 multiplies by an additional exponential factor (flares beyond the shell).
+function radius(t){
+  const lb = localBend(t);
+  const linear = t * Math.tan(localHalfAngle(t)) * H_MAX;
+  if(lb < 0.001) return linear;
+  return linear * Math.exp(lb * 2.2 * t);
+}
+
+// ── Buffers ────────────────────────────────────────────────────
+const outerVBO     = gl.createBuffer();
+const outerIBO     = gl.createBuffer();
+const fillVBO      = gl.createBuffer();
+const fillIBO      = gl.createBuffer();
+const fillEdgeVBO  = gl.createBuffer();  // wedge outline: two radial edges + top arc
+const ringVBO      = gl.createBuffer();
+const edgeVBO      = gl.createBuffer();
+const axisVBO      = gl.createBuffer();
+const arrowVBO     = gl.createBuffer();
+const origVBO      = gl.createBuffer();
+const baseVBO      = gl.createBuffer();
+
+let outerIdxCount  = 0;
+let fillIdxCount   = 0;
+let fillEdgeRanges = []; // [{first,count}] — 3 segments: edge0, edge1, arc
+let ringRanges     = [];
+let edgeCount      = 0;
+let axisCount      = 0;
+let arrowCount     = 0;
+
+function upVI(vbo,vd,ibo,id){
+  gl.bindBuffer(gl.ARRAY_BUFFER,vbo);
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(vd),gl.DYNAMIC_DRAW);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ibo);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(id),gl.DYNAMIC_DRAW);
+}
+function upV(vbo,vd){
+  gl.bindBuffer(gl.ARRAY_BUFFER,vbo);
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(vd),gl.DYNAMIC_DRAW);
+}
+
+// ── Outer cone + rings + edges ─────────────────────────────────
+function buildGeometry(){
+  const oV=[],oI=[],rV=[],eV=[],aV=[],arV=[];
+  ringRanges=[];
+
+  for(let r=0;r<=N_RINGS;r++){
+    const t=r/N_RINGS, y=t*H_MAX, rad=radius(t);
+
+    if(r%RING_STEP===0||r===N_RINGS){
+      const first=rV.length/3;
+      for(let s=0;s<=N_SEGS;s++){
+        const th=(s/N_SEGS)*Math.PI*2;
+        rV.push(Math.cos(th)*rad,y,Math.sin(th)*rad);
+      }
+      ringRanges.push({first,count:N_SEGS+1,t});
+    }
+
+    for(let s=0;s<=N_SEGS;s++){
+      const th=(s/N_SEGS)*Math.PI*2;
+      oV.push(Math.cos(th)*rad,y,Math.sin(th)*rad);
+    }
+  }
+
+  for(let r=0;r<N_RINGS;r++)
+    for(let s=0;s<N_SEGS;s++){
+      const a=r*(N_SEGS+1)+s,b=a+1,c=a+(N_SEGS+1),d=c+1;
+      oI.push(a,c,b,b,c,d);
+    }
+
+  // Vertical edge lines
+  const N_EDGES=18, baseR=radius(1.0);
+  for(let e=0;e<N_EDGES;e++){
+    const th=(e/N_EDGES)*Math.PI*2;
+    eV.push(0,0,0,Math.cos(th)*baseR,H_MAX,Math.sin(th)*baseR);
+  }
+  edgeCount=N_EDGES*2;
+
+  // Time axis
+  for(let i=0;i<=40;i++) aV.push(0,i/40*TIP_Y,0);
+  axisCount=41;
+
+  // Arrowhead (3-D cross)
+  const AH=0.10,AW=0.07,ty=TIP_Y;
+  arV.push(0,ty,0,-AW,ty-AH,0, 0,ty,0,AW,ty-AH,0, 0,ty,0,0,ty-AH,-AW, 0,ty,0,0,ty-AH,AW);
+  arrowCount=8;
+
+  // Origin dot ring
+  const gV=[];
+  for(let s=0;s<=N_SEGS;s++){
+    const th=(s/N_SEGS)*Math.PI*2;
+    gV.push(Math.cos(th)*0.04,0,Math.sin(th)*0.04);
+  }
+
+  upVI(outerVBO,oV,outerIBO,oI);
+  upV(ringVBO,rV);
+  upV(edgeVBO,eV);
+  upV(axisVBO,aV);
+  upV(arrowVBO,arV);
+  upV(origVBO,[0,0,0]);
+  upV(baseVBO,gV);
+  outerIdxCount=oI.length;
+
+  buildFillGeometry();
+}
+
+// ── Fill wedge + outline edges ─────────────────────────────────
+function buildFillGeometry(){
+  buildFillMesh();
+  buildFillEdges();
+}
+
+function buildFillMesh(){
+  const maxF = Math.max(localFill(0), localFill(1));
+  if(maxF < 0.005){ fillIdxCount=0; return; }
+
+  const verts=[],idxs=[];
+  function vc(){return verts.length/3;}
+  function addV(x,y,z){verts.push(x,y,z);}
+
+  // Curved outer surface — each ring r uses its own localFill(t) for angular extent.
+  // Fixed N_SEGS columns so we can use a regular index grid.
+  const cs=vc();
+  for(let r=0;r<=N_RINGS;r++){
+    const t=r/N_RINGS, y=t*H_MAX, rad=radius(t);
+    const fa=localFill(t)*Math.PI*2;
+    for(let s=0;s<=N_SEGS;s++){
+      const th=(s/N_SEGS)*fa;
+      addV(Math.cos(th)*rad, y, Math.sin(th)*rad);
+    }
+  }
+  for(let r=0;r<N_RINGS;r++)
+    for(let s=0;s<N_SEGS;s++){
+      const a=cs+r*(N_SEGS+1)+s,b=a+1,c=a+(N_SEGS+1),d=c+1;
+      idxs.push(a,c,b,b,c,d);
+    }
+
+  // Flat face at theta=0 (always straight — angle is 0 at every height)
+  const f1=vc();
+  for(let r=0;r<=N_RINGS;r++){
+    const t=r/N_RINGS,y=t*H_MAX,rad=radius(t);
+    addV(0,y,0); addV(rad,y,0);
+  }
+  for(let r=0;r<N_RINGS;r++){
+    const a=f1+r*2,b=a+1,c=a+2,d=c+1;
+    idxs.push(a,b,c,b,d,c);
+  }
+
+  // "Rotating cut" face — angle varies with height when taper≠0
+  const f2=vc();
+  for(let r=0;r<=N_RINGS;r++){
+    const t=r/N_RINGS,y=t*H_MAX,rad=radius(t);
+    const fa=localFill(t)*Math.PI*2;
+    addV(0,y,0);
+    addV(Math.cos(fa)*rad, y, Math.sin(fa)*rad);
+  }
+  for(let r=0;r<N_RINGS;r++){
+    const a=f2+r*2,b=a+1,c=a+2,d=c+1;
+    idxs.push(a,c,b,b,c,d);
+  }
+
+  // Top cap at localFill(1)
+  const caps=vc(), topR=radius(1.0);
+  const fa1=localFill(1)*Math.PI*2;
+  const nSec1=Math.max(2,Math.round(localFill(1)*N_SEGS));
+  addV(0,H_MAX,0);
+  for(let s=0;s<=nSec1;s++){
+    const th=(s/nSec1)*fa1;
+    addV(Math.cos(th)*topR,H_MAX,Math.sin(th)*topR);
+  }
+  for(let s=0;s<nSec1;s++) idxs.push(caps,caps+s+2,caps+s+1);
+
+  upVI(fillVBO,verts,fillIBO,idxs);
+  fillIdxCount=idxs.length;
+}
+
+function buildFillEdges(){
+  const maxF=Math.max(localFill(0),localFill(1));
+  if(maxF<0.005){fillEdgeRanges=[];return;}
+
+  const verts=[];
+  fillEdgeRanges=[];
+  function addSeg(pts){
+    const first=verts.length/3;
+    for(const p of pts) verts.push(p[0],p[1],p[2]);
+    fillEdgeRanges.push({first,count:pts.length});
+  }
+
+  // Edge at theta=0 — always a straight line along the cone surface
+  const e0=[];
+  for(let r=0;r<=N_RINGS;r++){
+    const t=r/N_RINGS,y=t*H_MAX,rad=radius(t);
+    e0.push([rad,y,0]);
+  }
+  addSeg(e0);
+
+  // "Rotating cut" edge — angle changes with height when taper≠0
+  const e1=[];
+  for(let r=0;r<=N_RINGS;r++){
+    const t=r/N_RINGS,y=t*H_MAX,rad=radius(t);
+    const fa=localFill(t)*Math.PI*2;
+    e1.push([Math.cos(fa)*rad,y,Math.sin(fa)*rad]);
+  }
+  addSeg(e1);
+
+  // Straight spokes on top cap: axis → rim at theta=0 and at rotating cut angle
+  const topR=radius(1.0);
+  const fa1=localFill(1)*Math.PI*2;
+  addSeg([[0,H_MAX,0],[topR,H_MAX,0]]);
+  addSeg([[0,H_MAX,0],[Math.cos(fa1)*topR,H_MAX,Math.sin(fa1)*topR]]);
+
+  // Top arc (always last — drawn with special full-alpha pass)
+  const nSec1=Math.max(2,Math.round(localFill(1)*N_SEGS));
+  const arc=[];
+  for(let s=0;s<=nSec1;s++){
+    const th=(s/nSec1)*fa1;
+    arc.push([Math.cos(th)*topR,H_MAX,Math.sin(th)*topR]);
+  }
+  addSeg(arc);
+
+  upV(fillEdgeVBO,verts);
+}
+
+// ── Draw helpers ───────────────────────────────────────────────
+function bindVBO(vbo){
+  gl.bindBuffer(gl.ARRAY_BUFFER,vbo);
+  gl.vertexAttribPointer(L.aPos,3,gl.FLOAT,false,0,0);
+  gl.enableVertexAttribArray(L.aPos);
+}
+function drawMesh(vbo,ibo,count,color,fade){
+  bindVBO(vbo);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ibo);
+  gl.uniform4fv(L.uColor,color);
+  gl.uniform1i(L.uFade,fade?1:0);
+  gl.drawElements(gl.TRIANGLES,count,gl.UNSIGNED_SHORT,0);
+}
+function drawLines(vbo,first,count,color,mode){
+  bindVBO(vbo);
+  gl.uniform4fv(L.uColor,color);
+  gl.uniform1i(L.uFade,0);
+  gl.drawArrays(mode||gl.LINE_STRIP,first,count);
+}
+
+// ── Render ─────────────────────────────────────────────────────
+const dpr=Math.min(devicePixelRatio,2);
+const timeLabel=document.getElementById('time-label');
+
+function render(){
+  gl.clearColor(0.023,0.035,0.059,1);
+  gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+
+  const asp=canvas.width/canvas.height;
+  const proj=perspective(Math.PI/4,asp,0.05,40);
+  const eye=[
+    target[0]+dist*Math.cos(elevation)*Math.sin(azimuth),
+    target[1]+dist*Math.sin(elevation),
+    target[2]+dist*Math.cos(elevation)*Math.cos(azimuth),
+  ];
+  const view=lookAt(eye,target,[0,1,0]);
+  const mvp=mul(proj,view);
+  gl.uniformMatrix4fv(L.uMVP,false,mvp);
+
+  // Position "time" label
+  const tip=project3D(0,TIP_Y,0,mvp,canvas.width,canvas.height,dpr);
+  timeLabel.style.left=(tip.x+14)+'px';
+  timeLabel.style.top=tip.y+'px';
+
+  gl.enable(gl.DEPTH_TEST);
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+  gl.depthMask(false);
+
+  // Fill wedge (amber surface)
+  if(fillIdxCount>0){
+    drawMesh(fillVBO,fillIBO,fillIdxCount,[1.0,0.45,0.25,0.72],true);
+  }
+
+  // Outer cone — back then front
+  gl.enable(gl.CULL_FACE);
+  gl.cullFace(gl.FRONT);
+  drawMesh(outerVBO,outerIBO,outerIdxCount,[0.0,0.78,0.94,0.09],true);
+  gl.cullFace(gl.BACK);
+  drawMesh(outerVBO,outerIBO,outerIdxCount,[0.0,0.78,0.94,0.09],true);
+  gl.disable(gl.CULL_FACE);
+
+  // Horizontal rings
+  for(const{first,count,t} of ringRanges)
+    drawLines(ringVBO,first,count,[0.0,0.80,0.94,0.18+0.55*t],gl.LINE_STRIP);
+
+  // Vertical edges
+  gl.uniform4fv(L.uColor,[0.0,0.78,0.94,0.15]);
+  gl.uniform1i(L.uFade,0);
+  bindVBO(edgeVBO);
+  gl.drawArrays(gl.LINES,0,edgeCount);
+
+  // Fill wedge radial cut edges (the two straight lines from apex)
+  if(fillEdgeRanges.length>0){
+    bindVBO(fillEdgeVBO);
+    gl.uniform4fv(L.uColor,[1.0,0.58,0.28,0.92]);
+    gl.uniform1i(L.uFade,0);
+    // Draw all but the last segment (top arc) now; arc drawn after origin
+    for(let i=0;i<fillEdgeRanges.length-1;i++){
+      const{first,count}=fillEdgeRanges[i];
+      gl.drawArrays(gl.LINE_STRIP,first,count);
+    }
+  }
+
+  // Time axis (white)
+  drawLines(axisVBO,0,axisCount,[1.0,1.0,1.0,0.7],gl.LINE_STRIP);
+
+  // Arrowhead (white)
+  gl.uniform4fv(L.uColor,[1.0,1.0,1.0,0.8]);
+  gl.uniform1i(L.uFade,0);
+  bindVBO(arrowVBO);
+  gl.drawArrays(gl.LINES,0,arrowCount);
+
+  // Origin point
+  gl.depthMask(true);
+  bindVBO(origVBO);
+  gl.uniform4fv(L.uColor,[0.85,0.97,1.0,1.0]);
+  gl.uniform1i(L.uFade,0);
+  gl.drawArrays(gl.POINTS,0,1);
+
+  drawLines(baseVBO,0,N_SEGS+1,[0.85,0.97,1.0,0.6],gl.LINE_STRIP);
+
+  // Top arc of fill wedge — drawn last so it's always on top
+  if(fillEdgeRanges.length>0){
+    const arc=fillEdgeRanges[fillEdgeRanges.length-1];
+    bindVBO(fillEdgeVBO);
+    gl.uniform4fv(L.uColor,[1.0,0.62,0.28,1.0]);
+    gl.uniform1i(L.uFade,0);
+    gl.drawArrays(gl.LINE_STRIP,arc.first,arc.count);
+  }
+
+  gl.depthMask(false);
+  gl.disable(gl.BLEND);
+  gl.disable(gl.DEPTH_TEST);
+}
+
+// ── Resize ─────────────────────────────────────────────────────
+function resize(){
+  canvas.width=innerWidth*dpr; canvas.height=innerHeight*dpr;
+  canvas.style.width=innerWidth+'px'; canvas.style.height=innerHeight+'px';
+  gl.viewport(0,0,canvas.width,canvas.height);
+}
+
+// ── Orbit ──────────────────────────────────────────────────────
+let drag=null;
+canvas.addEventListener('mousedown',e=>{drag={x:e.clientX,y:e.clientY};canvas.classList.add('dragging');});
+window.addEventListener('mousemove',e=>{
+  if(!drag) return;
+  azimuth  -=(e.clientX-drag.x)*0.007;
+  elevation+=(e.clientY-drag.y)*0.007;
+  elevation=Math.max(-1.45,Math.min(1.45,elevation));
+  drag.x=e.clientX;drag.y=e.clientY;render();
+});
+window.addEventListener('mouseup',()=>{drag=null;canvas.classList.remove('dragging');});
+canvas.addEventListener('wheel',e=>{
+  e.preventDefault();
+  dist*=1+e.deltaY*0.0008;
+  dist=Math.max(1.5,Math.min(14,dist));render();
+},{passive:false});
+canvas.addEventListener('touchstart',e=>{
+  if(e.touches.length===1) drag={x:e.touches[0].clientX,y:e.touches[0].clientY};
+},{passive:true});
+canvas.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  if(e.touches.length===1&&drag){
+    azimuth  -=(e.touches[0].clientX-drag.x)*0.007;
+    elevation+=(e.touches[0].clientY-drag.y)*0.007;
+    elevation=Math.max(-1.45,Math.min(1.45,elevation));
+    drag.x=e.touches[0].clientX;drag.y=e.touches[0].clientY;render();
+  }
+},{passive:false});
+canvas.addEventListener('touchend',()=>drag=null,{passive:true});
+
+// ── Sliders ────────────────────────────────────────────────────
+function setPct(el){
+  const pct=(((+el.value)-(+el.min))/(+el.max-(+el.min))*100).toFixed(2);
+  el.parentElement.style.setProperty('--p',pct);
+}
+
+function updateGrowthTaperLimits(){
+  const sl=document.getElementById('sGrowthTaper');
+  const mn=-Math.round(bend*100);
+  const mx=Math.round((1-bend)*100);
+  sl.min=mn; sl.max=mx;
+  const clamped=Math.max(mn,Math.min(mx,+sl.value));
+  sl.value=clamped;
+  growthTaper=clamped;
+  document.getElementById('vGrowthTaper').textContent=(clamped>=0?'+':'')+clamped+'%';
+  setPct(sl);
+}
+document.getElementById('sBend').addEventListener('input',e=>{
+  bend=e.target.value/100;
+  document.getElementById('vBend').textContent=Math.round(e.target.value)+'%';
+  setPct(e.target);
+  updateGrowthTaperLimits();
+  buildGeometry(); render();
+});
+document.getElementById('sGrowthTaper').addEventListener('input',e=>{
+  const v=+e.target.value;
+  growthTaper=v;
+  document.getElementById('vGrowthTaper').textContent=(v>=0?'+':'')+v+'%';
+  setPct(e.target); buildGeometry(); render();
+});
+function updateConstantTaperLimits(){
+  const sl=document.getElementById('sConstTaper');
+  const mn=(-constantVal).toFixed(1);
+  const mx=(10-constantVal).toFixed(1);
+  sl.min=mn; sl.max=mx;
+  const clamped=Math.max(+mn,Math.min(+mx,+sl.value));
+  sl.value=clamped;
+  constantTaper=clamped;
+  document.getElementById('vConstTaper').textContent=(clamped>=0?'+':'')+clamped.toFixed(1);
+  setPct(sl);
+}
+document.getElementById('sAngle').addEventListener('input',e=>{
+  constantVal=+e.target.value;
+  document.getElementById('vAngle').textContent=constantVal.toFixed(1);
+  setPct(e.target);
+  updateConstantTaperLimits();
+  buildGeometry(); render();
+});
+document.getElementById('sConstTaper').addEventListener('input',e=>{
+  const v=+e.target.value;
+  constantTaper=v;
+  document.getElementById('vConstTaper').textContent=(v>=0?'+':'')+v.toFixed(1);
+  setPct(e.target); buildGeometry(); render();
+});
+function updateTaperLimits(){
+  const sl=document.getElementById('sTaper');
+  const mn=-Math.round(fill*100);
+  const mx=Math.round((1-fill)*100);
+  sl.min=mn; sl.max=mx;
+  // clamp current taper value to new range
+  const clamped=Math.max(mn,Math.min(mx,+sl.value));
+  sl.value=clamped;
+  taper=clamped/100;
+  document.getElementById('vTaper').textContent=(clamped>=0?'+':'')+clamped+'%';
+  setPct(sl);
+}
+
+document.getElementById('sFill').addEventListener('input',e=>{
+  fill=e.target.value/100;
+  document.getElementById('vFill').textContent=e.target.value+'%';
+  setPct(e.target);
+  updateTaperLimits();
+  buildFillGeometry(); render();
+});
+document.getElementById('sTaper').addEventListener('input',e=>{
+  const v=+e.target.value;
+  taper=v/100;
+  document.getElementById('vTaper').textContent=(v>=0?'+':'')+v+'%';
+  setPct(e.target); buildFillGeometry(); render();
+});
+
+['sBend','sAngle','sFill'].forEach(id=>setPct(document.getElementById(id)));
+updateGrowthTaperLimits();
+updateConstantTaperLimits();
+updateTaperLimits();
+
+// ── Boot ───────────────────────────────────────────────────────
+window.addEventListener('resize',()=>{resize();render();});
+resize(); buildGeometry(); render();
+</script>
