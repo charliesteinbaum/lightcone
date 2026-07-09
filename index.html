@@ -42,7 +42,7 @@ canvas.dragging{cursor:grabbing}
   z-index:10;
 }
 #hud-title{
-  font-size:10px;
+  font-size:14px;
   letter-spacing:.4em;
   color:#fff;
   font-weight:400;
@@ -50,7 +50,7 @@ canvas.dragging{cursor:grabbing}
   opacity:1;
 }
 #hud-sub{
-  font-size:9px;
+  font-size:11px;
   letter-spacing:.18em;
   color:var(--text);
   margin-top:5px;
@@ -65,7 +65,7 @@ canvas.dragging{cursor:grabbing}
   display:flex;
   align-items:center;
   gap:5px;
-  font-size:9px;
+  font-size:11px;
   letter-spacing:.28em;
   color:#fff;
   text-transform:uppercase;
@@ -99,7 +99,7 @@ canvas.dragging{cursor:grabbing}
 .group-header{
   grid-row:1;
   padding:7px 20px 5px;
-  font-size:9px;
+  font-size:11px;
   letter-spacing:.32em;
   text-transform:uppercase;
   color:#fff;
@@ -134,7 +134,7 @@ canvas.dragging{cursor:grabbing}
 .ctrl.market  {--accent:#FF7240;}
 
 .ctrl-label{
-  font-size:9px;
+  font-size:11px;
   letter-spacing:.32em;
   color:#fff;
   text-transform:uppercase;
@@ -191,7 +191,7 @@ input[type=range]::-moz-range-thumb{
   left:calc(var(--p)*0.01*(100% - 46px) + 23px);
   transform:translate(-50%,-50%);
   pointer-events:none;
-  font-size:9px;
+  font-size:11px;
   font-weight:700;
   letter-spacing:.02em;
   font-variant-numeric:tabular-nums;
@@ -216,14 +216,14 @@ input[type=range]::-moz-range-thumb{
   transform:translateY(-50%);
 }
 #tt-name{
-  font-size:9px;
+  font-size:11px;
   letter-spacing:.32em;
   text-transform:uppercase;
   font-weight:700;
   margin-bottom:9px;
 }
 #tt-body{
-  font-size:9px;
+  font-size:11px;
   line-height:1.7;
   color:rgba(255,255,255,0.58);
   letter-spacing:.03em;
@@ -247,7 +247,7 @@ input[type=range]::-moz-range-thumb{
   overflow-y:auto;
 }
 .sidebar-section{
-  font-size:7px;
+  font-size:9px;
   letter-spacing:.36em;
   text-transform:uppercase;
   color:#fff;
@@ -261,7 +261,7 @@ input[type=range]::-moz-range-thumb{
   border-radius:5px;
   color:var(--pc, rgba(255,255,255,0.6));
   font-family:'Courier New',Courier,monospace;
-  font-size:9px;
+  font-size:11px;
   letter-spacing:.12em;
   text-transform:uppercase;
   padding:6px 8px;
@@ -296,17 +296,12 @@ input[type=range]::-moz-range-thumb{
 <div id="sidebar">
   <button class="preset-btn active" data-preset="custom">Custom</button>
 
-  <div class="sidebar-section">Cautionary</div>
   <button class="preset-btn cautionary" data-preset="yahoo">Yahoo</button>
   <button class="preset-btn cautionary" data-preset="myspace">Myspace</button>
   <button class="preset-btn cautionary" data-preset="blackberry">BlackBerry</button>
-
-  <div class="sidebar-section">Success</div>
   <button class="preset-btn success" data-preset="google">Google</button>
   <button class="preset-btn success" data-preset="uber">Uber</button>
   <button class="preset-btn success" data-preset="airbnb">Airbnb</button>
-
-  <div class="sidebar-section">AI Era</div>
   <button class="preset-btn ai" data-preset="cursor">Cursor</button>
   <button class="preset-btn ai" data-preset="mercor">Mercor</button>
 </div>
