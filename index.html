@@ -982,7 +982,10 @@ function loadPreset(name){
 }
 
 document.querySelectorAll('.preset-btn').forEach(btn=>{
-  btn.addEventListener('click',()=>loadPreset(btn.dataset.preset));
+  btn.addEventListener('click',()=>{
+    document.getElementById('tooltip').style.display='none';
+    loadPreset(btn.dataset.preset);
+  });
 });
 
 // ── Story tooltips ─────────────────────────────────────────────
