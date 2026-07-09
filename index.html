@@ -948,18 +948,27 @@ function loadPreset(name){
   $('sBend').value=Math.round(bend*100);
   $('vBend').textContent=Math.round(bend*100)+'%';
   setPct($('sBend'));
+  // Update growth taper limits NOW so the value below isn't browser-clamped
+  $('sGrowthTaper').min=-Math.round(bend*100);
+  $('sGrowthTaper').max=Math.round((1-bend)*100);
 
   constantVal=p.cv;
   $('sAngle').value=constantVal;
   $('vAngle').textContent=constantVal.toFixed(1);
   setPct($('sAngle'));
+  // Update const taper limits NOW
+  $('sConstTaper').min=(-constantVal).toFixed(1);
+  $('sConstTaper').max=(10-constantVal).toFixed(1);
 
   fill=p.fill;
   $('sFill').value=Math.round(fill*100);
   $('vFill').textContent=Math.round(fill*100)+'%';
   setPct($('sFill'));
+  // Update taper limits NOW
+  $('sTaper').min=-Math.round(fill*100);
+  $('sTaper').max=Math.round((1-fill)*100);
 
-  // Pre-load taper slider values before limit updaters clamp them
+  // Pre-load taper slider values — limits are correct, no browser clamping
   $('sGrowthTaper').value=p.gt;
   $('sConstTaper').value=p.ct;
   $('sTaper').value=p.t;
