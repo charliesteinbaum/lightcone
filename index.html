@@ -29,6 +29,7 @@ canvas{
   display:block;
   position:fixed;
   top:0;left:0;
+  right:130px;
   cursor:grab;
   touch-action:none;
 }
@@ -84,7 +85,7 @@ canvas.dragging{cursor:grabbing}
 
 #controls{
   position:fixed;
-  bottom:0;left:0;right:0;
+  bottom:0;left:0;right:130px;
   display:grid;
   grid-template-columns:repeat(3,1fr);
   grid-template-rows:auto 1fr 1fr;
@@ -197,6 +198,59 @@ input[type=range]::-moz-range-thumb{
   color:#06090F;
   white-space:nowrap;
 }
+
+/* ── Sidebar presets ─────────────────────────────────────────── */
+#sidebar{
+  position:fixed;
+  right:0;top:0;bottom:0;
+  width:130px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  gap:3px;
+  padding:16px 12px;
+  background:rgba(6,9,15,0.88);
+  border-left:1px solid rgba(255,255,255,0.28);
+  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
+  z-index:20;
+  overflow-y:auto;
+}
+.sidebar-section{
+  font-size:7px;
+  letter-spacing:.36em;
+  text-transform:uppercase;
+  color:#fff;
+  opacity:.40;
+  padding:8px 0 3px;
+}
+.sidebar-section:first-child{padding-top:0}
+.preset-btn{
+  background:transparent;
+  border:1px solid var(--pc, rgba(255,255,255,0.25));
+  border-radius:5px;
+  color:var(--pc, rgba(255,255,255,0.6));
+  font-family:'Courier New',Courier,monospace;
+  font-size:9px;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  padding:6px 8px;
+  cursor:pointer;
+  text-align:left;
+  transition:background .15s, color .15s;
+  white-space:nowrap;
+}
+.preset-btn:hover{
+  background:color-mix(in srgb, var(--pc,#fff) 15%, transparent);
+}
+.preset-btn.active{
+  background:var(--pc, rgba(255,255,255,0.25));
+  color:#06090F;
+  font-weight:700;
+}
+.preset-btn.cautionary{--pc:#FF6B6B;}
+.preset-btn.success   {--pc:#4CC98A;}
+.preset-btn.ai        {--pc:#9B71EA;}
 </style>
 
 <canvas id="c"></canvas>
@@ -206,6 +260,24 @@ input[type=range]::-moz-range-thumb{
 </div>
 
 <div id="time-label">time</div>
+
+<div id="sidebar">
+  <button class="preset-btn active" data-preset="none">None</button>
+
+  <div class="sidebar-section">Cautionary</div>
+  <button class="preset-btn cautionary" data-preset="yahoo">Yahoo</button>
+  <button class="preset-btn cautionary" data-preset="myspace">Myspace</button>
+  <button class="preset-btn cautionary" data-preset="blackberry">BlackBerry</button>
+
+  <div class="sidebar-section">Success</div>
+  <button class="preset-btn success" data-preset="google">Google</button>
+  <button class="preset-btn success" data-preset="uber">Uber</button>
+  <button class="preset-btn success" data-preset="airbnb">Airbnb</button>
+
+  <div class="sidebar-section">AI Era</div>
+  <button class="preset-btn ai" data-preset="cursor">Cursor</button>
+  <button class="preset-btn ai" data-preset="mercor">Mercor</button>
+</div>
 
 <div id="controls">
   <div class="group-header exo">Exogenous</div>
@@ -705,8 +777,9 @@ function render(){
 
 // ── Resize ─────────────────────────────────────────────────────
 function resize(){
-  canvas.width=innerWidth*dpr; canvas.height=innerHeight*dpr;
-  canvas.style.width=innerWidth+'px'; canvas.style.height=innerHeight+'px';
+  const W=innerWidth-130, H=innerHeight;
+  canvas.width=W*dpr; canvas.height=H*dpr;
+  canvas.style.width=W+'px'; canvas.style.height=H+'px';
   gl.viewport(0,0,canvas.width,canvas.height);
 }
 
@@ -825,6 +898,61 @@ document.getElementById('sTaper').addEventListener('input',e=>{
 updateGrowthTaperLimits();
 updateConstantTaperLimits();
 updateTaperLimits();
+
+// ── Presets ────────────────────────────────────────────────────
+const PRESETS = {
+  none:       { bend:0,    gt:0,   cv:5,  ct:0,  fill:0.30, t:0   },
+  yahoo:      { bend:0.80, gt:-35, cv:6,  ct:-2, fill:0.70, t:-65 },
+  myspace:    { bend:0.85, gt:-25, cv:7,  ct:-2, fill:0.80, t:-80 },
+  blackberry: { bend:0.75, gt:20,  cv:5,  ct:1,  fill:0.50, t:-50 },
+  google:     { bend:0.90, gt:-10, cv:8,  ct:2,  fill:0.55, t:35  },
+  uber:       { bend:0.85, gt:-15, cv:7,  ct:-1, fill:0.70, t:-10 },
+  airbnb:     { bend:0.80, gt:-10, cv:6,  ct:0,  fill:0.45, t:20  },
+  cursor:     { bend:0.85, gt:15,  cv:8,  ct:2,  fill:0.35, t:40  },
+  mercor:     { bend:0.75, gt:25,  cv:4,  ct:2,  fill:0.30, t:-15 },
+};
+
+function loadPreset(name){
+  const p=PRESETS[name]; if(!p) return;
+  const $=id=>document.getElementById(id);
+
+  // Set parent state + sliders
+  bend=p.bend;
+  $('sBend').value=Math.round(bend*100);
+  $('vBend').textContent=Math.round(bend*100)+'%';
+  setPct($('sBend'));
+
+  constantVal=p.cv;
+  $('sAngle').value=constantVal;
+  $('vAngle').textContent=constantVal.toFixed(1);
+  setPct($('sAngle'));
+
+  fill=p.fill;
+  $('sFill').value=Math.round(fill*100);
+  $('vFill').textContent=Math.round(fill*100)+'%';
+  setPct($('sFill'));
+
+  // Pre-load taper slider values before limit updaters clamp them
+  $('sGrowthTaper').value=p.gt;
+  $('sConstTaper').value=p.ct;
+  $('sTaper').value=p.t;
+
+  // Limit updaters clamp, set state vars, and refresh display + --p
+  updateGrowthTaperLimits();
+  updateConstantTaperLimits();
+  updateTaperLimits();
+
+  // Update active button
+  document.querySelectorAll('.preset-btn').forEach(b=>{
+    b.classList.toggle('active', b.dataset.preset===name);
+  });
+
+  buildGeometry(); render();
+}
+
+document.querySelectorAll('.preset-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>loadPreset(btn.dataset.preset));
+});
 
 // ── Boot ───────────────────────────────────────────────────────
 window.addEventListener('resize',()=>{resize();render();});
